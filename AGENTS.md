@@ -31,6 +31,14 @@ The update must be included in the commit itself. If a commit hash cannot be kno
 
 ## Commit history
 
+### 2026-08-21 - Chapter 8: Enhancing our app with Flyway migrations
+
+- Added Chapter 8 documentation covering Flyway migrations, schema history, configuration, and migration workflow.
+- Added Flyway schema and seed migrations, enabled Flyway, and configured Hibernate schema validation for production and tests.
+- Validation: git diff --check passed; Maven validation/tests have not been rerun for this commit.
+- Commit hash: 2535d65.
+
+
 ### 2026-08-19 - Initial Codex repository guidance and memory
 
 - Added this `AGENTS.md` with project conventions, commit-scope rules, and the GitHub-commit update requirement.

@@ -2888,6 +2888,134 @@ We also update `src/test/resources/application.yaml` to replace `${JWT_SECRET}` 
 
 **Invalid token and missing token both return 401** — two tests verify `JwtAuthFilter`'s handling of a malformed `Bearer` token and a completely absent `Authorization` header, both leaving the `SecurityContext` empty.
 
+We have now finished coding our app's functionality.
+
+In subsequent chapters, we add some enhancements to apply some production best practices.
+
+</details>
+
+### Chapter 8: Enhancing our app with Flyway migrations
+
+Project dependencies added:
+
+    Flyway Core
+    Flyway MySQL
+
+#### Overview
+
+In this chapter, we replace the database's implicit initialization with **Flyway** database migrations.  The database schema and initial data are managed by versioned SQL files that are executed automatically when the application starts.
+
+The same migrations are used for both the production MySQL database and the H2 database used by the integration tests. This keeps the two environments aligned and ensures that the tests run against the same schema definition as the application.
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant Application
+    participant Flyway
+    participant Database
+    participant Hibernate
+
+    Application ->> Flyway: Start application context
+    Flyway ->> Database: Check flyway_schema_history
+    Flyway ->> Database: Apply pending migrations
+    Flyway -->> Application: Database is initialized
+    Application ->> Hibernate: Build JPA context
+    Hibernate ->> Database: Validate entity mappings
+    Database -->> Hibernate: Schema matches
+    Hibernate -->> Application: Application is ready
+```
+
+<details>
+
+<summary>Chapter Walkthrough</summary>
+
+Previously, the application relied on database setup scripts outside the normal application startup process.  The assumption is that the database is legacy and the schema will likely not change.  However, this approach is not suitable for schemas that evolve over time because it makes the installed schema version difficult to track and requires manual coordination.  Production teams rely on a different approach to manage schema migrations.
+
+One approach is to use **Flyway**.  With Flyway, we track each migration as part of the application's versioned source code.  To keep track of which migrations have already been applied, when they were applied, and whether they succeeded, Flyway adds a schema history table named `flyway_schema_history` by default. This table also stores migration checksums, descriptions, execution times, and other metadata.
+
+Flyway performs the following steps:
+
+1. It checks the configured database schema for `flyway_schema_history`. If the table does not exist, Flyway creates it.
+2. It scans the configured migration locations, such as the application classpath, for available migrations.
+3. It compares the available migrations with the entries in the schema history table. Previously applied migrations are validated using their checksums. If an applied migration has been modified, validation fails.
+4. New migrations are marked as pending. Versioned migrations are sorted by version number and applied in order.
+5. After each migration is applied, Flyway records the result in `flyway_schema_history`.
+
+To use Flyway, we need **Flyway Core**:
+
+```xml
+<dependency>
+    <artifactId>flyway-core</artifactId>
+    <groupId>org.flywaydb</groupId>
+</dependency>
+```
+
+Since our database is MySQL, we also need **Flyway MySQL**:
+
+```xml
+<dependency>
+    <artifactId>flyway-mysql</artifactId>
+    <groupId>org.flywaydb</groupId>
+</dependency>
+```
+
+We add the above snippets in `pom.xml`.
+
+We then create the directory `src/main/resources/db/migration` to contain our migration scripts.  In this directory, we create `V1__create_schema.sql` that contains the same scripts as `assets/create.sql`, and `V2__seed_initial_data.sql` that contains the same scripts as `assets/load.sql`.  The execution order is now explicit: the schema is created by version 1, then the data is loaded by version 2.
+
+Flyway does not execute the SQL files in `assets`; the migration copies under `src/main/resources/db/migration` are the files used by the application.  We can technically delete them, but we keep the original files as reference copies.
+
+To enable our app to use Flyway, we need to modify our production and test configuration files.  In `src/main/resources/application.yaml` we add new keys `spring.jpa.hibernate.ddl-auto` and `spring.flyway.enabled`:
+
+```yaml
+spring:
+  application:
+    name: starzz-boot
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+```
+
+Hibernate is configured with `ddl-auto: validate`, so it checks that the JPA entities match the schema without attempting to create, update, or delete database tables.
+
+The production datasource still obtains its connection details from environment variables. The
+migrations therefore initialize the configured MySQL database without placing database credentials
+in the repository.
+
+For a fresh development database, we can drop the manually created tables before starting the application so Flyway can create them through V1. We should not drop an existing production database. An existing database must instead be baselined or migrated carefully before Flyway is introduced.
+
+In `src/test/resources/application.yaml` we also add new key `spring.flyway.enabled` and `spring.jpa.hibernate.ddl-auto` to `validate`.  Since we now intend to use Flyway for our H2 database's creation and seeding, we can delete the keys `spring.jpa.defer-datasource-initialization` and `spring.sql`:
+
+```yaml
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+  flyway:
+    enabled: true
+  h2:
+    console:
+      enabled: true
+```
+
+ For our production and test databases, Spring Boot now has the following workflow: On startup, Flyway runs first and establishes the schema. Hibernate then checks the tables and columns against the entity mappings. If the schema and mappings do not match, startup fails rather than silently changing the database.
+
+When a future schema change is needed, we add another migration such as `V3__add_new_column.sql`, run the application, and allow Flyway to apply it. The migration history then documents how the database evolved and gives production and test environments the same upgrade path.
+
 </details>
 
 ## Conclusion
