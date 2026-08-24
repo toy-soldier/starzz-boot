@@ -4,15 +4,26 @@ description: Verified current state and working context for the starzz-boot repo
 type: project
 ---
 
+## Current session handoff
+
+- Chapter 8, “Enhancing our app with Flyway migrations,” was added to `README.md` and committed.
+- Flyway dependencies, production/test configuration, and migrations `V1__create_schema.sql` and `V2__seed_initial_data.sql` were committed and pushed to `origin/enhancements`.
+- Pushed commit: `7119aa2` (commit message: `Chapter 8: Enhancing our app with Flyway migrations`).
+- `mvnw.cmd validate` passed. Full tests were not run in this turn.
+- Pre-existing local changes remain uncommitted: `memory/codex_project.md` (this update), `.claude/`, `CLAUDE.md`, and `memory/project_roadmap.md`.
+- Chapter 9 is planned as `Chapter 9: Enhancing our app with Docker containerization`.
+- The recommended approach is Docker Compose with separate application and MySQL containers, connected through the Compose network and using a named volume for MySQL persistence.
+- The Spring Boot application should run Flyway migrations against the MySQL container; application and database should not be combined into one image.
+
 # starzz-boot — verified project memory
 
-Last audited: 2026-08-19
+Last audited: 2026-08-24
 
 ## What this project is
 
 `starzz-boot` is a Java 17 Spring Boot REST API for a legacy MySQL astronomy dataset. It manages galaxies, constellations, stars, and users. The package root is `com.sanjayrisbud.starzzboot`.
 
-The repository README is a long, chapter-based walkthrough covering routes, JPA persistence, DTO mapping, validation, exception handling, unit tests, integration tests, BCrypt password hashing, and JWT/Spring Security. The current code is at the end of that walkthrough (Chapter 7: JWT), not at the earlier roadmap state.
+The repository README is a long, chapter-based walkthrough covering routes, JPA persistence, DTO mapping, validation, exception handling, unit tests, integration tests, BCrypt password hashing, and JWT/Spring Security. The current code is at the end of that walkthrough (Chapter 8: Flyway migrations), not at the earlier roadmap state.
 
 ## Build and configuration
 
@@ -25,10 +36,19 @@ The repository README is a long, chapter-based walkthrough covering routes, JPA 
 - Production DB values come from `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`; JWT signing secret comes from `JWT_SECRET`. Do not expose `.env` values in logs or memory.
 - The password-reset sentinel is configured as `app.security.password-reset-sentinel: resetRequired`; JWT expiration is 86,400,000 ms (one day).
 - Admin usernames are configured under `app.admins` (`admin1`, `admin2`, `admin3` in the current checked-in config).
-- Tests use H2 in MySQL compatibility mode with `create-drop` and seed data from `assets/load.sql`.
+
+
+
+
+- Tests use H2 in MySQL compatibility mode and run the same Flyway migrations as production.
 - `.env`, `target/`, IDE metadata, and the generated HTML coverage report are ignored.
 
 ## Architecture
+
+
+
+
+
 
 The implementation follows Controller -> Service -> Repository -> JPA Entity, with explicit mapper and DTO layers.
 

@@ -31,6 +31,12 @@ The update must be included in the commit itself. If a commit hash cannot be kno
 
 ## Commit history
 
+### 2026-08-24 - Update project memory for Docker chapter planning
+
+- Updated `memory/codex_project.md` with the current Chapter 8 Flyway status and the planned Chapter 9 Docker Compose direction.
+- Validation: reviewed the scoped diff and confirmed unrelated working-tree files remain unstaged; Docker was not installed for Compose validation.
+- Commit hash: 8c40f22.
+
 ### 2026-08-21 - Chapter 8: Enhancing our app with Flyway migrations
 
 - Added Chapter 8 documentation covering Flyway migrations, schema history, configuration, and migration workflow.
