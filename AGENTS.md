@@ -31,6 +31,12 @@ The update must be included in the commit itself. If a commit hash cannot be kno
 
 ## Commit history
 
+### 2026-08-27 - Chapter 9: Enhancing our app with Docker containerization
+
+- Added the MySQL database initialization setting, Docker Compose documentation, and container build configuration for the Spring Boot application.
+- Validation: `git diff --check` and scoped review passed; live Docker validation was blocked because sudo requires an interactive password.
+- Commit hash: 5e7554f (commit before the required hash-entry amend).
+
 ### 2026-08-27 - Chapter 9: Docker containerization
 
 - Added Docker Compose documentation and configuration, a multi-stage Java 17 Dockerfile, Docker build exclusions, and refreshed project memory.

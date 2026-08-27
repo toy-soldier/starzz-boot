@@ -3055,6 +3055,7 @@ Because our application and database will run in separate containers, we also ne
 
 Since we will be using the MySQL 9.6 Docker image, we need to provide several environment variables to configure the MySQL container:
 
+    MYSQL_DATABASE
     MYSQL_USER
     MYSQL_PASSWORD
     MYSQL_ROOT_PASSWORD
@@ -3116,13 +3117,23 @@ Compose starts the `mysql` service by downloading the MySQL image if it is not a
 
 For the `app` service, Compose builds an image using our `Dockerfile` and performs the necessary configuration. It waits until the `mysql` service passes its health check before starting the application container. When the application starts, Flyway applies any required database migrations and seeds the database as configured. The API is then available at `http://localhost:8080`.
 
+To verify that Flyway migration worked, open another console window in the repository root and check for the Flyway logs:
+
+```bash
+docker compose logs app | grep -i flyway
+```
+
+There should be a log similar to
+
+    Creating Schema History table `starzz`.`flyway_schema_history` ...
+
 To stop the containers while retaining the database volume, execute:
 
 ```bash
 docker compose down
 ```
 
-This removes the containers and Compose network but leaves the `mysql-data` volume intact. The database contents therefore remain available when the stack is started again.
+This removes the containers and Compose network but leaves the `mysql-data` volume intact. The existing database contents therefore remain available when the stack is started again. As a result, the Flyway logs should not show any `Creating...` messages for objects that have already been created.
 
 To remove the database volume and create a fresh database on the next startup, use the explicitly destructive volume option:
 
@@ -3130,7 +3141,9 @@ To remove the database volume and create a fresh database on the next startup, u
 docker compose down --volumes
 ```
 
-</summary>
+When the stack is restarted, the Flyway logs should now show `Creating...` messages.
+
+</details>
 
 ## Conclusion
 
