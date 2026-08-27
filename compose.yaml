@@ -1,0 +1,35 @@
+services:
+  mysql:
+    image: mysql:9.6.0
+    environment:
+      MYSQL_DATABASE: starzz
+      MYSQL_USER: ${DOCKER_MYSQL_USER:?DOCKER_MYSQL_USER must be set in .env}
+      MYSQL_PASSWORD: ${DOCKER_MYSQL_PASSWORD:?DOCKER_MYSQL_PASSWORD must be set in .env}
+      MYSQL_ROOT_PASSWORD: ${DOCKER_MYSQL_ROOT_PASSWORD:?DOCKER_MYSQL_ROOT_PASSWORD must be set in .env}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DB_URL: ${DOCKER_MYSQL_URL:?DOCKER_MYSQL_URL must be set in .env}
+      DB_USERNAME: ${DOCKER_MYSQL_USER:?DOCKER_MYSQL_USER must be set in .env}
+      DB_PASSWORD: ${DOCKER_MYSQL_PASSWORD:?DOCKER_MYSQL_PASSWORD must be set in .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql-data:
