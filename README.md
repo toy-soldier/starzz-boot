@@ -14,7 +14,7 @@ This project serves two purposes:
 **Learning resource**: A guided walkthrough for developers familiar with Spring Boot, showing why each layer exists and how the components interact.
 
 The API manages a database of fictional galaxies, constellations, and stars. You’ll see how entities, DTOs, mappers, services, and controllers work together to process requests and return structured responses.
-Mermaid diagrams illustrate request flows, allowing readers to quickly grasp the architecture while detailed explanations provide deeper insight.
+Mermaid diagrams illustrate request flows, allowing readers to quickly grasp the architecture while chapter walkthroughs provide deeper insight.
 
 ## Features
 
@@ -28,7 +28,9 @@ Mermaid diagrams illustrate request flows, allowing readers to quickly grasp the
 - JWT-based authentication with Spring Security
 - Role-based access control (ADMIN and USER roles)
 - Unit testing using JUnit 5 and Mockito
-- Integration testing using Spring Boot Test and H2
+- Integration testing using H2
+- Database migration using Flyway
+- Containerization using Docker
 - Postman collection included
 - Architecture diagrams using Mermaid
 
@@ -3012,12 +3014,124 @@ spring:
       enabled: true
 ```
 
- For our production and test databases, Spring Boot now has the following workflow: On startup, Flyway runs first and establishes the schema. Hibernate then checks the tables and columns against the entity mappings. If the schema and mappings do not match, startup fails rather than silently changing the database.
+For our production and test databases, Spring Boot now has the following workflow: On startup, Flyway runs first and establishes the schema. Hibernate then checks the tables and columns against the entity mappings. If the schema and mappings do not match, startup fails rather than silently changing the database.
 
 When a future schema change is needed, we add another migration such as `V3__add_new_column.sql`, run the application, and allow Flyway to apply it. The migration history then documents how the database evolved and gives production and test environments the same upgrade path.
 
 </details>
 
+### Chapter 9: Enhancing our app with Docker containerization
+
+Project dependencies added:
+
+    None
+
+#### Overview
+
+In this chapter, we package the Spring Boot application and its MySQL database as a reproducible Docker Compose stack.  The application and database run in separate Docker containers, allowing each service to be managed and configured independently.
+
+The database container is derived from the official MySQL 9.6 Docker image, while the application container is built from a custom Dockerfile that packages the Spring Boot application into a lightweight Java runtime image.  A Compose file brings both containers together, configuring their environment variables, networking, database connection, and port mappings so the complete application stack can be started consistently with a single command.
+
+```mermaid
+flowchart LR
+    User --> Compose
+    Compose --> App[Spring Boot app\ncontainer]
+    Compose --> MySQL[MySQL\ncontainer]
+    App -->|jdbc:mysql://mysql:3306/starzz| MySQL
+    MySQL --> Volume[(mysql-data\nvolume)]
+```
+
+<details>
+
+<summary>Chapter Walkthrough</summary>
+
+Containerization is a technology that packages an application and its dependencies into isolated, portable environments called **containers**, allowing the application to run consistently across different environments.  One popular containerization technology is **Docker**.  It is widely adopted, well supported by the Java and Spring ecosystem, and provides a straightforward way to package and run applications along with their dependencies.
+
+In this project, we will create separate Docker images for each of the application's components.  We will use the official MySQL 9.6 Docker image for the database and build a custom image containing our Spring Boot application.  These images serve as the blueprints from which our containers are created.  The containers are the actual running instances of those images.
+
+Because our application and database will run in separate containers, we also need a way to configure and manage how those containers work together.  This is where **Docker Compose** comes in.  Docker provides the containerization technology itself, while Docker Compose provides a convenient way to define, configure, network, and run multiple containers as a single application stack.
+
+*The Docker images*
+
+Since we will be using the MySQL 9.6 Docker image, we need to provide several environment variables to configure the MySQL container:
+
+    MYSQL_USER
+    MYSQL_PASSWORD
+    MYSQL_ROOT_PASSWORD
+
+Rather than hardcoding these sensitive values later in our Compose configuration, we store them in our `.env` file:
+
+    DOCKER_MYSQL_USER=<corresponds to MYSQL_USER>
+    DOCKER_MYSQL_PASSWORD=<corresponds to MYSQL_PASSWORD>
+    DOCKER_MYSQL_ROOT_PASSWORD=<corresponds to MYSQL_ROOT_PASSWORD>
+
+We also define `DOCKER_MYSQL_URL`, which contains the JDBC URL that the application will use to connect to the MySQL container.  We keep this separate from `DB_URL`, which contains the URL used when connecting to our local MySQL instance.
+
+Make sure that `DOCKER_MYSQL_URL` sets the flag `createDatabaseIfNotExists` to `true`:
+
+    jdbc:mysql://mysql:3306/starzz?...&createDatabaseIfNotExists=true
+
+`createDatabaseIfNotExists=true` creates the database, while Flyway creates the tables and seed data.
+
+The `.env.example` file serves as a template for creating `.env` files:
+
+    JWT_SECRET=<your_jwt_secret>
+
+    DB_URL=<your_local_mysql_url>
+    DB_USERNAME=<your_local_mysql_user>
+    DB_PASSWORD=<your_local_mysql_password>
+
+    DOCKER_MYSQL_URL=<your_docker_mysql_url>
+    DOCKER_MYSQL_USER=<your_docker_mysql_user>
+    DOCKER_MYSQL_PASSWORD=<your_docker_mysql_password>
+    DOCKER_MYSQL_ROOT_PASSWORD=<your_docker_mysql_root_password>
+
+We use this template to create `.env` files containing the values specific to each developer's local environment. These files remain on the developer's machine and are not committed to the repository.
+
+For the application image, we create a `Dockerfile` that uses a two-stage build. The first stage compiles the project and creates the application's JAR using a Maven/JDK 17 base image. The second stage copies the JAR into a JRE 17 base image, giving us a smaller runtime image without Maven or the JDK.
+
+The first stage copies the project files into the build image. Since the project contains files and directories that are not required to compile the application, we use `.dockerignore` to prevent unnecessary files from being included in the Docker build context.
+
+*The Compose configuration*
+
+We use `compose.yaml` to define and configure the two containers that make up our application stack: the `mysql` service for our MySQL database and the `app` service for our Spring Boot application.
+
+The `mysql` service uses the official `mysql:9.6.0` image.  Its environment variables are populated from our `.env` file.  We map port `3306` on the host to port `3306` in the container and use a named volume, `mysql-data`, to persist the database data when the container is stopped or recreated.
+
+The MySQL service also has a **health check** that periodically uses `mysqladmin` to verify that the database is ready to accept connections.  This is important because starting the MySQL container does not necessarily mean that MySQL is immediately ready for the application to use.
+
+The `app` service is built from our `Dockerfile`.  Its environment variables configure the database connection and JWT secret using values from `.env`.  Port `8080` is mapped from the container to the host so that we can access the Spring Boot application from our local machine.
+
+Finally, `depends_on` establishes the relationship between the two services.  Rather than simply starting the application after the MySQL container starts, we configure Compose to wait until the MySQL health check succeeds before starting the application.  This prevents the Spring Boot application from attempting to connect to a database that is still initializing.  This is particularly important because Flyway remains responsible for creating and seeding the database schema when the application starts.
+
+*Running the Stack*
+
+After creating the `.env` file, open a console window from the repository root and execute:
+
+```bash
+docker compose up --build
+```
+
+Compose starts the `mysql` service by downloading the MySQL image if it is not already available locally, performing the necessary configuration, and creating a container from the image.
+
+For the `app` service, Compose builds an image using our `Dockerfile` and performs the necessary configuration. It waits until the `mysql` service passes its health check before starting the application container. When the application starts, Flyway applies any required database migrations and seeds the database as configured. The API is then available at `http://localhost:8080`.
+
+To stop the containers while retaining the database volume, execute:
+
+```bash
+docker compose down
+```
+
+This removes the containers and Compose network but leaves the `mysql-data` volume intact. The database contents therefore remain available when the stack is started again.
+
+To remove the database volume and create a fresh database on the next startup, use the explicitly destructive volume option:
+
+```bash
+docker compose down --volumes
+```
+
+</summary>
+
 ## Conclusion
 
-**starzz-boot** demonstrates a complete, production-style Spring Boot REST API built incrementally — from setting up routes and wiring in a MySQL database, to layering in DTO mapping, validation, and global exception handling, to covering the application with unit and integration tests, to securing passwords with BCrypt hashing, and finally locking down the API with Spring Security, JWT-based authentication, and role-based access control.  Each chapter builds on the last, reflecting how a real backend evolves in practice.
+**starzz-boot** demonstrates a complete, production-style Spring Boot REST API built incrementally — from setting up routes and wiring in a MySQL database, to layering in DTO mapping, validation, and global exception handling, to covering the application with unit and integration tests, to securing passwords with BCrypt hashing, locking down the API with Spring Security, JWT-based authentication, and role-based access control.  We then enhance our application with some production best practices, specifically implementing database migrations with Flyway and packaging the application with Docker. Each chapter builds on the last, reflecting how a real backend evolves in practice.

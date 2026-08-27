@@ -1,0 +1,12 @@
+.git
+.gitignore
+.claude
+.env
+CLAUDE.md
+AGENTS.md
+memory
+target
+htmlReport
+.idea
+.vscode
+*.iml

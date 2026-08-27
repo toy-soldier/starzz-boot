@@ -6,112 +6,51 @@ type: project
 
 ## Current session handoff
 
-- Chapter 8, “Enhancing our app with Flyway migrations,” was added to `README.md` and committed.
-- Flyway dependencies, production/test configuration, and migrations `V1__create_schema.sql` and `V2__seed_initial_data.sql` were committed and pushed to `origin/enhancements`.
-- Pushed commit: `7119aa2` (commit message: `Chapter 8: Enhancing our app with Flyway migrations`).
-- `mvnw.cmd validate` passed. Full tests were not run in this turn.
-- Pre-existing local changes remain uncommitted: `memory/codex_project.md` (this update), `.claude/`, `CLAUDE.md`, and `memory/project_roadmap.md`.
-- Chapter 9 is planned as `Chapter 9: Enhancing our app with Docker containerization`.
-- The recommended approach is Docker Compose with separate application and MySQL containers, connected through the Compose network and using a named volume for MySQL persistence.
-- The Spring Boot application should run Flyway migrations against the MySQL container; application and database should not be combined into one image.
+- Chapter 8 (Flyway migrations) is committed in `7119aa2`.
+- Chapter 9 (Docker containerization) is now documented in `README.md`. Current uncommitted changes update `.dockerignore`, `.env.example`, `Dockerfile`, `compose.yaml`, and the README.
+- The Docker design uses separate Spring Boot and MySQL services, a multi-stage Java 17 image build, a named `mysql-data` volume, a MySQL health check, and `depends_on: condition: service_healthy`.
+- Java 17.0.18 is available. However, `mvnw.cmd` currently fails in its PowerShell bootstrap with `Cannot index into a null array`, so Maven validation and tests could not run through the required wrapper.
+- Docker is not installed in the current environment, so Compose configuration and live-stack validation could not run.
+- Review note resolved: although `compose.yaml` does not set `MYSQL_DATABASE`, `.env` contains `createDatabaseIfNotExists=true` in `DOCKER_MYSQL_URL`, so the JDBC connection can create the `starzz` database before Flyway runs. The actual secret-bearing `.env` values remain intentionally undisclosed.
+- Preserve unrelated uncommitted artifacts: `.claude/`, `CLAUDE.md`, and `memory/project_roadmap.md`.
 
-# starzz-boot — verified project memory
+## Verified project state
 
-Last audited: 2026-08-24
+Last audited: 2026-08-27
 
-## What this project is
+`starzz-boot` is a Java 17 Spring Boot 3.4.5 REST API for a legacy MySQL astronomy dataset. It manages galaxies, constellations, stars, and users. The package root is `com.sanjayrisbud.starzzboot`.
 
-`starzz-boot` is a Java 17 Spring Boot REST API for a legacy MySQL astronomy dataset. It manages galaxies, constellations, stars, and users. The package root is `com.sanjayrisbud.starzzboot`.
-
-The repository README is a long, chapter-based walkthrough covering routes, JPA persistence, DTO mapping, validation, exception handling, unit tests, integration tests, BCrypt password hashing, and JWT/Spring Security. The current code is at the end of that walkthrough (Chapter 8: Flyway migrations), not at the earlier roadmap state.
+The README is a chapter-based walkthrough covering routes, JPA persistence, DTO mapping, validation, exception handling, unit and integration tests, BCrypt password hashing, JWT/Spring Security, Flyway migrations, and Docker containerization. The source code is at the Flyway stage; Docker changes are currently documentation/configuration changes in the working tree.
 
 ## Build and configuration
 
-- Maven wrapper: `mvnw` / `mvnw.cmd`.
-- Maven project version: `com.sanjayrisbud:starzz-boot:0.0.1-SNAPSHOT`.
-- Java release: 17.
-- Spring Boot parent: 3.4.5.
-- Main dependencies: Web, Data JPA, Validation, MySQL runtime driver, H2 test database, Spring Security, Spring Security Test, Lombok, spring-dotenv, and JJWT 0.12.6.
-- Production settings are in `src/main/resources/application.yaml`.
-- Production DB values come from `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`; JWT signing secret comes from `JWT_SECRET`. Do not expose `.env` values in logs or memory.
-- The password-reset sentinel is configured as `app.security.password-reset-sentinel: resetRequired`; JWT expiration is 86,400,000 ms (one day).
-- Admin usernames are configured under `app.admins` (`admin1`, `admin2`, `admin3` in the current checked-in config).
-
-
-
-
+- Maven wrapper: `mvnw` / `mvnw.cmd`; use `mvnw.cmd` on Windows.
+- Maven coordinates: `com.sanjayrisbud:starzz-boot:0.0.1-SNAPSHOT`.
+- Java release: 17. Spring Boot parent: 3.4.5.
+- Main dependencies include Web, Data JPA, Validation, MySQL, H2 tests, Spring Security, Spring Security Test, Lombok, spring-dotenv, Flyway, and JJWT 0.12.6.
+- Production database values use `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD`; JWT signing uses `JWT_SECRET`. Never expose `.env` values.
 - Tests use H2 in MySQL compatibility mode and run the same Flyway migrations as production.
-- `.env`, `target/`, IDE metadata, and the generated HTML coverage report are ignored.
+- Docker uses `mysql:9.6.0`, fixed host mappings `3306:3306` and `8080:8080`, `DOCKER_MYSQL_*` variables, and `DOCKER_MYSQL_URL` for the app in-network JDBC URL.
+- `Dockerfile` builds with Maven/JDK 17 and runs the JAR on `eclipse-temurin:17-jre` as a non-root `spring` user. `.dockerignore` excludes secrets, build output, IDE metadata, and documentation artifacts.
+- `.env`, `target/`, IDE metadata, and generated HTML coverage output are ignored.
 
-## Architecture
+## Architecture and API
 
+The implementation follows Controller -> Service -> Repository -> JPA Entity, with explicit DTO and mapper layers. Controllers cover authentication plus galaxies, constellations, stars, and users. Relationships are lazy `ManyToOne` links, with cascading removal from Galaxy -> Constellation -> Star.
 
+Implemented routes include CRUD for galaxies, constellations, and stars; user listing, lookup, creation, update, and password change; and `POST /login`. There is intentionally no user-delete route because legacy foreign-key relationships should be preserved.
 
-
-
-
-The implementation follows Controller -> Service -> Repository -> JPA Entity, with explicit mapper and DTO layers.
-
-- `controllers/`: `AuthController`, `GalaxyController`, `ConstellationController`, `StarController`, `UserController`.
-- `services/`: CRUD/business logic for each resource plus `AuthService` and `JwtService`.
-- `repositories/`: plain `JpaRepository` interfaces; `UserRepository` additionally has `findByName`.
-- `models/`: `User`, `Galaxy`, `Constellation`, `Star`; relationships are lazy `ManyToOne` links and cascading removal from Galaxy -> Constellation -> Star.
-- `mappers/`: manual conversion to summary/detail DTOs; summary DTOs avoid exposing nested relationships.
-- `dtos/`: validated request DTOs, summary records, detail DTOs, error/token/password-reset responses.
-- `exceptions/`: `GlobalExceptionHandler`, `ResourceNotFoundException`, and `PasswordResetRequiredException`.
-- `config/` and `filters/`: `SecurityConfig`, `AdminProperties`, and `JwtAuthFilter`.
-
-On updates, the resource services use `getEntity(newId, currentEntity)` helpers: a null ID clears the relationship; an unchanged ID reuses the current entity; a changed ID is loaded through the relevant service/repository and can produce a 404.
-
-## HTTP API currently implemented
-
-- `GET /galaxies`, `/galaxies/{id}`
-- `POST /galaxies`, `PUT /galaxies/{id}`, `DELETE /galaxies/{id}`
-- Equivalent routes for `/constellations` and `/stars`.
-- `GET /users`, `/users/{id}`; `POST /users`; `PUT /users/{id}`.
-- `PATCH /users/{id}/change-password`.
-- `POST /login` returning `{ "token": "..." }`.
-
-Create returns 201 with a `Location` header and detail body. Update returns 200 with a detail body. Delete returns 204. Resource-not-found and invalid input are handled as 404/400 JSON responses containing a message and timestamp.
-
-There is no `DELETE /users/{id}` method in the current `UserController`; this is intentional in the README because the legacy foreign-key relationships should be preserved.
-
-## Security behavior
-
-`SecurityConfig` disables CSRF, form login, and HTTP Basic, and uses stateless sessions. `JwtAuthFilter` reads `Authorization: Bearer ...`, validates the signed token through `JwtService`, and installs a `ROLE_ADMIN` or `ROLE_USER` authority. Invalid/missing tokens leave the request unauthenticated.
-
-Current access rules:
-
-- Public: `POST /login`, `PATCH /users/*/change-password`, and GET routes for galaxies, constellations, and stars.
-- `POST /users` requires role `ADMIN`.
-- All other routes require authentication.
-- Unauthenticated protected requests use a custom 401 entry point; authenticated users without permission receive 403 from Spring Security.
-
-New users receive a BCrypt hash of the sentinel rather than a usable password. Login with the sentinel is rejected with 403 and a response containing the user ID, allowing the client to call the public change-password route. Wrong credentials produce 401 without revealing whether the username exists.
+Security is stateless JWT with `ROLE_ADMIN` and `ROLE_USER`. Public routes are login, password change, and GET routes for astronomy resources. Creating users requires ADMIN; other protected routes require authentication. New users receive a BCrypt hash of the configured `resetRequired` sentinel.
 
 ## Tests and verification
 
-Tests include:
+Tests include service unit tests, MVC controller tests, and full Spring Boot integration tests covering all controller areas, authentication, JWT access, roles, invalid tokens, and password-reset behavior. The README's 99.7% IntelliJ coverage figure is documentation evidence until the suite can be rerun.
 
-- Service unit tests for galaxy, constellation, star, user, auth, and JWT services.
-- MVC controller tests for all five controllers using `@WebMvcTest` and `MockMvc`; security filters are disabled in these isolated tests.
-- Full integration tests for all five controller areas using `@SpringBootTest`, `@AutoConfigureMockMvc`, H2, and seeded SQL. Auth integration tests exercise real login, JWT access, roles, invalid/missing tokens, and password-reset behavior.
-- Shared `DtoFactory` and `EntityFactory` helpers are under `src/test/.../helpers`.
+Current verification: `git diff --check` passed; Java 17 is available; Maven wrapper validation was blocked by the wrapper bootstrap error; Docker validation was blocked because Docker is not installed.
 
-The README reports 99.7% IntelliJ line coverage, with only the application main method uncovered. This should be treated as documentation evidence until the suite is rerun in a Java 17 environment.
+## Source-of-truth guidance
 
-On 2026-08-19, `mvnw.cmd test` did not reach test execution: the machine used Oracle/OpenJDK 11 and Maven failed compiling tests with `release version 17 not supported`. Maven also emitted a warning that Lombok uses the nonstandard dependency scope `annotationProcessor`; investigate that separately if build modernization is requested.
-
-## Claude artifact discrepancies
-
-The checked-in `CLAUDE.md` and `memory/project_roadmap.md` are stale relative to the repository:
-
-- They describe Spring Boot 4.0.2, while `pom.xml` and README use 3.4.5.
-- They describe hardcoded DB credentials, while current production configuration uses environment variables and spring-dotenv.
-- They say controller tests are still planned and that only service tests exist, while controller unit tests and integration tests are present.
-- They omit the implemented BCrypt/JWT/security layer.
-
-Use the code, `pom.xml`, current YAML files, tests, and README as the source of truth. Re-check this memory after material code or configuration changes.
+Use `README.md`, `pom.xml`, YAML configuration, source, migrations, and tests as authoritative. `CLAUDE.md` and `memory/project_roadmap.md` may be stale and should not override the repository. Do not expose credentials or JWT secrets, modify `target/` or `htmlReport/`, or stage unrelated user changes.
 
 ## Useful commands
 
@@ -120,7 +59,6 @@ Use the code, `pom.xml`, current YAML files, tests, and README as the source of 
 ./mvnw clean install
 ./mvnw clean test
 ./mvnw clean test -Dtest=ConstellationServiceTest
-./mvnw clean test -Dtest=ConstellationServiceTest#methodName
+docker compose up --build
+docker compose down
 ```
-
-Before running Maven, verify that `java -version` reports Java 17 or newer and that the required DB environment variables are available for application runs. Integration tests use their own H2/test configuration.

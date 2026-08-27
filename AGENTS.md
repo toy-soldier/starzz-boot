@@ -31,6 +31,12 @@ The update must be included in the commit itself. If a commit hash cannot be kno
 
 ## Commit history
 
+### 2026-08-27 - Chapter 9: Docker containerization
+
+- Added Docker Compose documentation and configuration, a multi-stage Java 17 Dockerfile, Docker build exclusions, and refreshed project memory.
+- Validation: `git diff --check` passed; Java 17.0.18 is available; Maven wrapper validation was blocked by its PowerShell bootstrap error; Docker Compose validation was blocked because Docker is not installed.
+- Commit hash: c50e685 (commit before the required hash-entry amend).
+
 ### 2026-08-24 - Update project memory for Docker chapter planning
 
 - Updated `memory/codex_project.md` with the current Chapter 8 Flyway status and the planned Chapter 9 Docker Compose direction.
