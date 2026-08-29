@@ -31,6 +31,12 @@ The update must be included in the commit itself. If a commit hash cannot be kno
 
 ## Commit history
 
+### 2026-08-29 - Chapter 10: Enhancing our app with Swagger UI
+
+- Added Swagger UI and OpenAPI documentation, public documentation endpoint rules, JWT Bearer authorization in Swagger UI, demo screenshots, and a demo admin-user migration.
+- Validation: `mvnw.cmd test` passed with 116 tests, 0 failures, 0 errors, and 0 skipped; `git diff --check` passed. Docker validation remains blocked because Docker is not installed.
+- Commit hash: 9042774.
+
 ### 2026-08-27 - Chapter 9: Enhancing our app with Docker containerization
 
 - Added the MySQL database initialization setting, Docker Compose documentation, and container build configuration for the Spring Boot application.
