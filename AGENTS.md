@@ -31,6 +31,11 @@ The update must be included in the commit itself. If a commit hash cannot be kno
 
 ## Commit history
 
+### 2026-08-30 - Add Claude project guidance
+
+- Added the repository's Claude Code guidance, local Claude settings, launch configuration, and project roadmap files.
+- Validation: reviewed the added files and confirmed they do not contain `.env` values; commit hash: a060672 (before the required hash-entry amend).
+
 ### 2026-08-30 - Wrap-up enhancements
 
 - Updated the README with a table of contents and clarified the global Swagger UI security padlock behavior; adjusted an integration-test count for the seeded demo user.
