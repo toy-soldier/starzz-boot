@@ -31,6 +31,11 @@ The update must be included in the commit itself. If a commit hash cannot be kno
 
 ## Commit history
 
+### 2026-08-30 - Wrap-up enhancements
+
+- Updated the README with a table of contents and clarified the global Swagger UI security padlock behavior; adjusted an integration-test count for the seeded demo user.
+- Validation: `git diff --check` passed; Maven tests passed with 116 tests, 0 failures, 0 errors, and 0 skipped. Commit hash: 5e32192 (before the required hash-entry amend).
+
 ### 2026-08-29 - Chapter 10: Enhancing our app with Swagger UI
 
 - Added Swagger UI and OpenAPI documentation, public documentation endpoint rules, JWT Bearer authorization in Swagger UI, demo screenshots, and a demo admin-user migration.

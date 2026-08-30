@@ -46,7 +46,7 @@ class UserControllerIT {
     void getUserListReturns200AndList() throws Exception {
         mockMvc.perform(get("/users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(100));
+                .andExpect(jsonPath("$.length()").value(101));
     }
 
     @Test

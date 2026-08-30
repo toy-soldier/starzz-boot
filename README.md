@@ -16,6 +16,25 @@ This project serves two purposes:
 The API manages a database of fictional galaxies, constellations, and stars. You’ll see how entities, DTOs, mappers, services, and controllers work together to process requests and return structured responses.
 Mermaid diagrams illustrate request flows, allowing readers to quickly grasp the architecture while chapter walkthroughs provide deeper insight.
 
+## Table of Contents
+
+- [Features](#features)
+- [Key Design Decisions](#key-design-decisions)
+- [The Dataset](#the-dataset)
+- [Test Coverage](#test-coverage)
+- [The Application](#the-application)
+  - [Chapter 1: Setting up the routes](#chapter-1-setting-up-the-routes)
+  - [Chapter 2: Setting up the database](#chapter-2-setting-up-the-database)
+  - [Chapter 3: Setting up persistence layer enhancements](#chapter-3-setting-up-persistence-layer-enhancements)
+  - [Chapter 4: Setting up unit tests](#chapter-4-setting-up-unit-tests)
+  - [Chapter 5: Setting up integration tests](#chapter-5-setting-up-integration-tests)
+  - [Chapter 6: Setting up password hashing](#chapter-6-setting-up-password-hashing)
+  - [Chapter 7: Setting up JWT](#chapter-7-setting-up-jwt)
+  - [Chapter 8: Enhancing our app with Flyway migrations](#chapter-8-enhancing-our-app-with-flyway-migrations)
+  - [Chapter 9: Enhancing our app with Docker containerization](#chapter-9-enhancing-our-app-with-docker-containerization)
+  - [Chapter 10: Enhancing our app with Swagger UI](#chapter-10-enhancing-our-app-with-swagger-ui)
+- [Conclusion](#conclusion)
+
 ## Features
 
 - REST API built with Spring Boot
@@ -3245,6 +3264,8 @@ public OpenAPI starzzOpenAPI() {
 }
 ```
 
+Because the JWT Bearer scheme is added as a global OpenAPI security requirement, Swagger UI displays a padlock for every endpoint, including endpoints that are publicly accessible according to `SecurityConfig`.  The padlock reflects the generated API documentation; it does not change the application's runtime security rules.  Public astronomy GET endpoints can still be called without a JWT, while protected endpoints require authentication.
+
 Once the application is running, Springdoc inspects the existing Spring MVC controllers and generates an OpenAPI 3 specification.  Swagger UI presents that specification as an interactive web page, allowing users to inspect routes, request parameters, request bodies, response types, and other information that can be inferred from the application.
 
 The generated specification is available at `http://localhost:8080/v3/api-docs`, and Swagger UI is available at
@@ -3256,13 +3277,13 @@ Swagger UI can display the API and invoke public endpoints such as `GET /constel
 
 ![Swagger UI 2](assets/swagger_ui_2.png)
 
-Note the open padlock icon, which signifies that the request is unprotected.
+Although the endpoint displays a padlock because the OpenAPI security requirement is global, the request succeeds without a JWT because the endpoint is public in `SecurityConfig`.
 
 Without a JWT, calls to protected endpoints such as `GET /users/1` return **HTTP 401**:
 
 ![Swagger UI 3](assets/swagger_ui_3.png)
 
-Again note the open padlock icon.
+The padlock does not by itself distinguish this endpoint from the public endpoints; the **HTTP 401** response confirms that this endpoint is protected by the application's runtime security rules.
 
 To access the protected endpoints, first login using the `/login` endpoint and copy the returned token:
 
@@ -3280,7 +3301,7 @@ It should now say "Authorized".  Close the dialog box and retry the protected en
 
 ![Swagger UI 5](assets/swagger_ui_5.png)
 
-Note the closed padlock icon, which signifies that the request is protected.
+The request now succeeds because Swagger UI sends the JWT through the configured Bearer authentication scheme.
 
 To aid in demos, a dummy user is inserted in the database.  Refer to `src/main/resources/db/migration/V3__insert_admin_user_for_demos.sql` for details.
 
