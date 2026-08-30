@@ -16,6 +16,25 @@ This project serves two purposes:
 The API manages a database of fictional galaxies, constellations, and stars. You’ll see how entities, DTOs, mappers, services, and controllers work together to process requests and return structured responses.
 Mermaid diagrams illustrate request flows, allowing readers to quickly grasp the architecture while chapter walkthroughs provide deeper insight.
 
+## Table of Contents
+
+- [Features](#features)
+- [Key Design Decisions](#key-design-decisions)
+- [The Dataset](#the-dataset)
+- [Test Coverage](#test-coverage)
+- [The Application](#the-application)
+  - [Chapter 1: Setting up the routes](#chapter-1-setting-up-the-routes)
+  - [Chapter 2: Setting up the database](#chapter-2-setting-up-the-database)
+  - [Chapter 3: Setting up persistence layer enhancements](#chapter-3-setting-up-persistence-layer-enhancements)
+  - [Chapter 4: Setting up unit tests](#chapter-4-setting-up-unit-tests)
+  - [Chapter 5: Setting up integration tests](#chapter-5-setting-up-integration-tests)
+  - [Chapter 6: Setting up password hashing](#chapter-6-setting-up-password-hashing)
+  - [Chapter 7: Setting up JWT](#chapter-7-setting-up-jwt)
+  - [Chapter 8: Enhancing our app with Flyway migrations](#chapter-8-enhancing-our-app-with-flyway-migrations)
+  - [Chapter 9: Enhancing our app with Docker containerization](#chapter-9-enhancing-our-app-with-docker-containerization)
+  - [Chapter 10: Enhancing our app with Swagger UI](#chapter-10-enhancing-our-app-with-swagger-ui)
+- [Conclusion](#conclusion)
+
 ## Features
 
 - REST API built with Spring Boot
@@ -31,6 +50,7 @@ Mermaid diagrams illustrate request flows, allowing readers to quickly grasp the
 - Integration testing using H2
 - Database migration using Flyway
 - Containerization using Docker
+- OpenAPI documentation viewable in Swagger UI
 - Postman collection included
 - Architecture diagrams using Mermaid
 
@@ -3068,11 +3088,11 @@ Rather than hardcoding these sensitive values later in our Compose configuration
 
 We also define `DOCKER_MYSQL_URL`, which contains the JDBC URL that the application will use to connect to the MySQL container.  We keep this separate from `DB_URL`, which contains the URL used when connecting to our local MySQL instance.
 
-Make sure that `DOCKER_MYSQL_URL` sets the flag `createDatabaseIfNotExists` to `true`:
+Make sure that `DOCKER_MYSQL_URL` sets the flag `createDatabaseIfNotExist` to `true`:
 
-    jdbc:mysql://mysql:3306/starzz?...&createDatabaseIfNotExists=true
+    jdbc:mysql://mysql:3306/starzz?...&createDatabaseIfNotExist=true
 
-`createDatabaseIfNotExists=true` creates the database, while Flyway creates the tables and seed data.
+`createDatabaseIfNotExist=true` creates the database, while Flyway creates the tables and seed data.
 
 The `.env.example` file serves as a template for creating `.env` files:
 
@@ -3145,6 +3165,148 @@ When the stack is restarted, the Flyway logs should now show `Creating...` messa
 
 </details>
 
+### Chapter 10: Enhancing our app with Swagger UI
+
+Project dependencies added:
+
+    Springdoc OpenAPI Starter WebMVC UI
+
+#### Overview
+
+In this chapter, we add generated OpenAPI documentation and an interactive Swagger UI to the application. We first configure Swagger UI to document and provide access to our public endpoints.  We then configure JWT bearer authentication in the UI so that our protected endpoints can also be explored and tested.
+
+The OpenAPI documentation endpoints are made publicly accessible through explicit permit-all rules in the existing security
+configuration.  Protected API endpoints continue to require their existing JWT authentication.
+
+```mermaid
+flowchart LR
+    Controllers[Existing controllers] --> Docs["/v3/api-docs"]
+    Browser --> Swagger[Swagger UI]
+    Swagger --> Docs
+
+    Browser --> API[Application API]
+    API --> Security[Existing JWT security]
+```
+
+<details>
+
+<summary>Chapter walkthrough</summary>
+
+OpenAPI provides a standardized way to describe a REST API, including its endpoints, parameters, request bodies, and responses.  Swagger UI presents the OpenAPI specification through an interactive web interface, making it easier for developers to explore and understand the API.  In short, OpenAPI defines the specification that describes the API, while Swagger UI provides an interface for viewing and testing that specification.
+
+The API documentation in this chapter is generated automatically from the existing Spring Boot application.  More detailed documentation could be added by annotating our controllers, methods, and model classes with additional OpenAPI metadata.  However, the objective of this chapter is to demonstrate how API documentation can be added to an existing application with minimal modification.  We therefore rely primarily on information that can be inferred from the application's existing code rather than modifying the existing controllers solely for documentation purposes.
+
+To auto-generate the documentation, we need **Springdoc OpenAPI Starter WebMVC UI** (or **Springdoc** for short):
+
+```xml
+<dependency>
+    <groupId>org.springdoc</groupId>
+    <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+    <version>2.8.13</version>
+</dependency>
+```
+
+We configure the documentation paths in `application.yaml`:
+
+```yaml
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+```
+
+Adding OpenAPI documentation and Swagger UI introduces new URL paths.  Recall that our application has JWT-protected endpoints and that we created a custom security configuration at
+`src/main/java/com/sanjayrisbud/starzzboot/config/SecurityConfig.java`.  This code:
+
+```java
+...
+.authorizeHttpRequests(auth -> auth
+    .requestMatchers(HttpMethod.POST, "/login").permitAll()
+    .requestMatchers(HttpMethod.PATCH, "/users/*/change-password").permitAll()
+    .requestMatchers(HttpMethod.GET, "/galaxies/**", "/constellations/**", "/stars/**").permitAll()
+    .requestMatchers(HttpMethod.POST, "/users").hasRole("ADMIN")
+    .anyRequest().authenticated()
+...
+```
+
+requires all paths that are not explicitly excluded to have a JWT. Our new documentation URLs will therefore also require JWTs unless we explicitly allow them.
+
+Our objective is to make the documentation publicly available, so we add rules that exclude the OpenAPI and Swagger UI paths from the JWT requirement:
+
+```java
+...
+.authorizeHttpRequests(auth -> auth
+    .requestMatchers(HttpMethod.POST, "/login").permitAll()
+    .requestMatchers(HttpMethod.PATCH, "/users/*/change-password").permitAll()
+    .requestMatchers(HttpMethod.GET, "/galaxies/**", "/constellations/**", "/stars/**").permitAll()
+    .requestMatchers(HttpMethod.POST, "/users").hasRole("ADMIN")
+    // These rules are for Swagger UI and OpenAPI documentation.
+    .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/v3/api-docs.yaml").permitAll()
+    .anyRequest().authenticated()
+...
+```
+
+To let Swagger UI call protected endpoints, we define the JWT Bearer scheme in a separate OpenAPI configuration. This describes the authentication mechanism in the generated document; it does not change the application's existing security rules:
+
+```java
+@Bean
+public OpenAPI starzzOpenAPI() {
+    return new OpenAPI()
+        .components(new Components()
+            .addSecuritySchemes("bearerAuth", new SecurityScheme()
+                .type(SecurityScheme.Type.HTTP)
+                .scheme("bearer")
+                .bearerFormat("JWT")))
+        .addSecurityItem(new SecurityRequirement().addList("bearerAuth"));
+}
+```
+
+Because the JWT Bearer scheme is added as a global OpenAPI security requirement, Swagger UI displays a padlock for every endpoint, including endpoints that are publicly accessible according to `SecurityConfig`.  The padlock reflects the generated API documentation; it does not change the application's runtime security rules.  Public astronomy GET endpoints can still be called without a JWT, while protected endpoints require authentication.
+
+Once the application is running, Springdoc inspects the existing Spring MVC controllers and generates an OpenAPI 3 specification.  Swagger UI presents that specification as an interactive web page, allowing users to inspect routes, request parameters, request bodies, response types, and other information that can be inferred from the application.
+
+The generated specification is available at `http://localhost:8080/v3/api-docs`, and Swagger UI is available at
+`http://localhost:8080/swagger-ui.html`:
+
+![Swagger UI 1](assets/swagger_ui_1.png)
+
+Swagger UI can display the API and invoke public endpoints such as `GET /constellations` without a JWT:
+
+![Swagger UI 2](assets/swagger_ui_2.png)
+
+Although the endpoint displays a padlock because the OpenAPI security requirement is global, the request succeeds without a JWT because the endpoint is public in `SecurityConfig`.
+
+Without a JWT, calls to protected endpoints such as `GET /users/1` return **HTTP 401**:
+
+![Swagger UI 3](assets/swagger_ui_3.png)
+
+The padlock does not by itself distinguish this endpoint from the public endpoints; the **HTTP 401** response confirms that this endpoint is protected by the application's runtime security rules.
+
+To access the protected endpoints, first login using the `/login` endpoint and copy the returned token:
+
+![Swagger UI Login](assets/swagger_ui_login.png)
+
+Swagger UI has an **Authorize** button at the top:
+
+![Swagger UI 4](assets/swagger_ui_4.png)
+
+Click it and in the resulting dialog box, input the token you had just copied and click **Authorize**:
+
+![Swagger UI Input Token](assets/swagger_ui_input_token.png)
+
+It should now say "Authorized".  Close the dialog box and retry the protected endpoint.  It should now return **HTTP 200**:
+
+![Swagger UI 5](assets/swagger_ui_5.png)
+
+The request now succeeds because Swagger UI sends the JWT through the configured Bearer authentication scheme.
+
+To aid in demos, a dummy user is inserted in the database.  Refer to `src/main/resources/db/migration/V3__insert_admin_user_for_demos.sql` for details.
+
+</details>
+
 ## Conclusion
 
-**starzz-boot** demonstrates a complete, production-style Spring Boot REST API built incrementally — from setting up routes and wiring in a MySQL database, to layering in DTO mapping, validation, and global exception handling, to covering the application with unit and integration tests, to securing passwords with BCrypt hashing, locking down the API with Spring Security, JWT-based authentication, and role-based access control.  We then enhance our application with some production best practices, specifically implementing database migrations with Flyway and packaging the application with Docker. Each chapter builds on the last, reflecting how a real backend evolves in practice.
+**starzz-boot** demonstrates a complete, production-style Spring Boot REST API built incrementally — from setting up routes and wiring in a MySQL database, to layering in DTO mapping, validation, and global exception handling, to covering the application with unit and integration tests, to securing passwords with BCrypt hashing, locking down the API with Spring Security, JWT-based authentication, and role-based access control. We then enhance our application with production best practices, specifically implementing database migrations with Flyway, packaging the application with Docker, and documenting the API with OpenAPI docs/Swagger UI. Each chapter builds on the last, reflecting how a real backend evolves in practice.
